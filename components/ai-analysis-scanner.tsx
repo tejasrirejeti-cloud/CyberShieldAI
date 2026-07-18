@@ -19,85 +19,131 @@ interface ScanResultData {
   scanTime: number
 }
 
-const analyzeURL = (url: string): { status: ScanResult; threats: string[]; confidence: number } => {
-  let status: ScanResult = "safe"
-  let threats: string[] = []
-  let confidence = 95
+const analyzeURL = (
+  url: string
+): { status: ScanResult; threats: string[]; confidence: number } => {
+  let status: ScanResult = "safe";
+  let threats: string[] = [];
+  let confidence = 95;
 
   try {
-    const urlObj = new URL(url)
-    const hostname = urlObj.hostname.toLowerCase()
-    const pathname = urlObj.pathname.toLowerCase()
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname.toLowerCase();
+    const pathname = urlObj.pathname.toLowerCase();
 
     // Check for IP address instead of domain
     if (/^\d+\.\d+\.\d+\.\d+/.test(hostname)) {
-      status = "suspicious"
-      threats.push("Direct IP address used instead of domain name")
-      confidence = 75
+      status = "suspicious";
+      threats.push("Direct IP address used instead of domain name");
+      confidence = 75;
     }
 
-    // Check for suspicious TLDs
-    const suspiciousTLDs = [".tk", ".ml", ".ga", ".cf", ".pw", ".xyz"]
-    if (suspiciousTLDs.some(tld => hostname.endsWith(tld))) {
-      if (status !== "suspicious") status = "suspicious"
-      threats.push("Known high-risk domain extension detected")
-      confidence = Math.min(confidence, 70)
+    // Check suspicious TLDs
+    const suspiciousTLDs = [".tk", ".ml", ".ga", ".cf", ".pw", ".xyz"];
+    if (suspiciousTLDs.some((tld) => hostname.endsWith(tld))) {
+      status = "suspicious";
+      threats.push("Known high-risk domain extension detected");
+      confidence = Math.min(confidence, 70);
     }
 
-    // Check for URL encoding tricks or obfuscation
+    // Check encoded URLs
     if (/%[0-9a-f]{2}/i.test(url)) {
-      if (status !== "suspicious") status = "suspicious"
-      threats.push("URL encoding detected - potential obfuscation attempt")
-      confidence = Math.min(confidence, 65)
+      status = "suspicious";
+      threats.push("URL encoding detected - potential obfuscation attempt");
+      confidence = Math.min(confidence, 65);
     }
 
-    // Check for suspicious subdomains (typosquatting patterns)
-    const commonBrands = ["apple", "google", "microsoft", "amazon", "facebook", "paypal", "bank"]
-    const subdomainMatch = hostname.split(".")[0]
-    if (commonBrands.some(brand => subdomainMatch.includes(brand)) && !hostname.includes(brand + ".com")) {
-      if (status !== "suspicious") status = "suspicious"
-      threats.push("Potential typosquatting domain detected")
-      confidence = Math.min(confidence, 72)
+    // Check typosquatting
+    const commonBrands = [
+      "apple",
+      "google",
+      "microsoft",
+      "amazon",
+      "facebook",
+      "paypal",
+      "bank",
+    ];
+
+    const subdomainMatch = hostname.split(".")[0];
+
+    const matchedBrand = commonBrands.find((brand) =>
+      subdomainMatch.includes(brand)
+    );
+
+    if (
+      matchedBrand &&
+      !hostname.includes(`${matchedBrand}.com`)
+    ) {
+      status = "suspicious";
+      threats.push("Potential typosquatting domain detected");
+      confidence = Math.min(confidence, 72);
     }
 
-    // Check for unusual ports
+    // Check unusual ports
     if (urlObj.port && !["80", "443", "8080"].includes(urlObj.port)) {
-      if (status !== "suspicious") status = "suspicious"
-      threats.push("Non-standard port number detected")
-      confidence = Math.min(confidence, 68)
+      status = "suspicious";
+      threats.push("Non-standard port number detected");
+      confidence = Math.min(confidence, 68);
     }
 
-    // Check for suspicious keywords in path
-    const pathSuspiciousKeywords = ["login", "verify", "confirm", "update", "validate", "urgent", "act-now", "claim"]
-    if (pathSuspiciousKeywords.some(kw => pathname.includes(kw))) {
-      if (status !== "suspicious") status = "suspicious"
-      threats.push("Suspicious path keywords detected")
-      confidence = Math.min(confidence, 70)
+    // Suspicious path keywords
+    const pathKeywords = [
+      "login",
+      "verify",
+      "confirm",
+      "update",
+      "validate",
+      "urgent",
+      "act-now",
+      "claim",
+    ];
+
+    if (pathKeywords.some((kw) => pathname.includes(kw))) {
+      status = "suspicious";
+      threats.push("Suspicious path keywords detected");
+      confidence = Math.min(confidence, 70);
     }
 
-    // Check for query parameters with sensitive keywords
-    const queryParams = urlObj.search.toLowerCase()
-    const dangerousParams = ["login", "password", "card", "ssn", "api_key", "token", "secret"]
-    if (dangerousParams.some(param => queryParams.includes(param))) {
-      status = "dangerous"
-      threats = ["Sensitive data exposed in URL parameters"]
-      confidence = 85
+    // Sensitive query parameters
+    const queryParams = urlObj.search.toLowerCase();
+    const dangerousParams = [
+      "login",
+      "password",
+      "card",
+      "ssn",
+      "api_key",
+      "token",
+      "secret",
+    ];
+
+    if (dangerousParams.some((param) => queryParams.includes(param))) {
+      status = "dangerous";
+      threats = ["Sensitive data exposed in URL parameters"];
+      confidence = 85;
     }
 
-    // Known malware/phishing keywords
-    if (["malware", "trojan", "phish", "ransomware", "worm"].some(kw => hostname.includes(kw))) {
-      status = "dangerous"
-      threats.push("Known malicious domain pattern")
-      confidence = 88
+    // Malware keywords
+    if (
+      ["malware", "trojan", "phish", "ransomware", "worm"].some((kw) =>
+        hostname.includes(kw)
+      )
+    ) {
+      status = "dangerous";
+      threats.push("Known malicious domain pattern");
+      confidence = 88;
     }
-  } catch (e) {
-    status = "suspicious"
-    threats.push("Invalid URL format or malformed URL structure")
-    confidence = 60
+  } catch {
+    status = "suspicious";
+    threats.push("Invalid URL format or malformed URL structure");
+    confidence = 60;
   }
 
-  return { status, threats, confidence }
-}
+  return {
+    status,
+    threats,
+    confidence,
+  };
+};
 
 const mockScan = async (input: string, type: ScanType): Promise<ScanResultData> => {
   // Simulate AI processing time
