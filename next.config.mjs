@@ -5,7 +5,8 @@ const nextConfig = {
     unoptimized: true,
   },
   basePath: "/CyberShieldAI",
-  assetPrefix: "/CyberShieldAI/",
+  assetPrefix: "/CyberShieldAI",
+  trailingSlash: true,
 };
 
 module.exports = nextConfig;
