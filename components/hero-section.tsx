@@ -4,11 +4,17 @@ import { motion } from "framer-motion"
 import { Shield, Activity, Lock, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
+const capabilities = [
+  { icon: Shield, label: "Threat Analysis", value: "Ready", color: "text-primary" },
+  { icon: Activity, label: "Monitoring", value: "Available", color: "text-cyber-green" },
+  { icon: Lock, label: "Authentication", value: "Secure", color: "text-cyber-cyan" },
+  { icon: Zap, label: "Response", value: "On Demand", color: "text-cyber-yellow" },
+]
+
 export function HeroSection() {
   return (
     <section className="relative min-h-screen flex items-center justify-center px-4 py-20">
       <div className="max-w-6xl mx-auto text-center relative z-10">
-        {/* System Status Indicator */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -19,10 +25,9 @@ export function HeroSection() {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyber-green opacity-75" />
             <span className="relative inline-flex rounded-full h-3 w-3 bg-cyber-green" />
           </span>
-          <span className="text-sm font-mono text-cyber-green">SYSTEM ACTIVE</span>
+          <span className="text-sm font-mono text-cyber-green">SECURITY PLATFORM READY</span>
         </motion.div>
 
-        {/* Animated Headline */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -36,24 +41,22 @@ export function HeroSection() {
               animate={{ opacity: [1, 0.7, 1] }}
               transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
             >
-              is Watching...
+              Detect. Analyze. Protect.
             </motion.span>
           </h1>
         </motion.div>
 
-        {/* Subtext */}
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
           className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-3xl mx-auto text-pretty"
         >
-          Real-time AI Protection Against Cyber Threats.
+          A security analysis platform for examining suspicious URLs, messages, and security events.
           <br className="hidden md:block" />
-          Detect. Analyze. Protect.
+          Real findings are displayed only when the application has actual analysis data.
         </motion.p>
 
-        {/* CTA Buttons */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -63,50 +66,43 @@ export function HeroSection() {
           <Button
             size="lg"
             className="bg-primary text-primary-foreground hover:bg-primary/90 glow-cyan text-lg px-8 py-6"
+            onClick={() => document.getElementById("scanner")?.scrollIntoView({ behavior: "smooth" })}
           >
             <Shield className="mr-2 h-5 w-5" />
-            Activate Protection
+            Analyze a Target
           </Button>
           <Button
             size="lg"
             variant="outline"
             className="border-primary/50 text-primary hover:bg-primary/10 text-lg px-8 py-6"
+            onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
           >
-            View Live Demo
+            View Capabilities
           </Button>
         </motion.div>
 
-        {/* Stats */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.8 }}
           className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8"
         >
-          {[
-            { icon: Shield, label: "Threats Blocked", value: "2.4M+", color: "text-primary" },
-            { icon: Activity, label: "Uptime", value: "99.99%", color: "text-cyber-green" },
-            { icon: Lock, label: "Protected Users", value: "50K+", color: "text-cyber-cyan" },
-            { icon: Zap, label: "Response Time", value: "<10ms", color: "text-cyber-yellow" },
-          ].map((stat, index) => (
+          {capabilities.map((item, index) => (
             <motion.div
-              key={stat.label}
+              key={item.label}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.4, delay: 1 + index * 0.1 }}
               className="glass-card rounded-xl p-4 md:p-6"
             >
-              <stat.icon className={`h-6 w-6 ${stat.color} mb-2 mx-auto`} />
-              <div className={`text-2xl md:text-3xl font-bold ${stat.color} font-mono`}>
-                {stat.value}
-              </div>
-              <div className="text-xs md:text-sm text-muted-foreground mt-1">{stat.label}</div>
+              <item.icon className={`h-6 w-6 ${item.color} mb-2 mx-auto`} />
+              <div className={`text-xl md:text-2xl font-bold ${item.color} font-mono`}>{item.value}</div>
+              <div className="text-xs md:text-sm text-muted-foreground mt-1">{item.label}</div>
             </motion.div>
           ))}
         </motion.div>
       </div>
 
-      {/* Scroll Indicator */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
