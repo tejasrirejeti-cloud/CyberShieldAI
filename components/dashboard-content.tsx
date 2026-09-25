@@ -41,7 +41,7 @@ export function DashboardContent({ user, profile }: { user: SupabaseUser; profil
     setLoading(false)
   }
 
-  useEffect(() => { void load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void load() }, [])
 
   const handleSignOut = async () => { await supabase.auth.signOut(); router.push("/"); router.refresh() }
   const markRead = async (id: string) => {

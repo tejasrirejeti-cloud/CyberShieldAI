@@ -27,7 +27,7 @@ export function ThreatDetectionPanel() {
     void loadThreats()
     const channel = supabase.channel("cybershield-threats").on("postgres_changes", { event: "*", schema: "public", table: "threats" }, () => void loadThreats()).subscribe()
     return () => { void supabase.removeChannel(channel) }
-  }, [supabase]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [supabase])
 
   const updateStatus = async (id: string, status: "resolved" | "dismissed") => {
     setActionError(null)
