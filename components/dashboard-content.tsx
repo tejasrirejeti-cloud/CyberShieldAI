@@ -1,569 +1,84 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { motion, AnimatePresence } from "framer-motion"
-import {
-  Shield,
-  LogOut,
-  Bell,
-  Settings,
-  Activity,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  Globe,
-  Server,
-  Wifi,
-  Lock,
-  Eye,
-  TrendingUp,
-  TrendingDown,
-  Clock,
-  User,
-  ChevronDown,
-  Menu,
-  X,
-} from "lucide-react"
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts"
+import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
+import { Bell, FileText, LogOut, ScanLine, Settings, Shield, User, Check, Archive } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { SecuritySettings } from "@/components/security-settings"
 
-interface Profile {
-  id: string
-  full_name: string | null
-  avatar_url: string | null
-  created_at: string
-}
+interface Profile { id: string; full_name: string | null; avatar_url: string | null; created_at: string }
+interface ScanRow { id: string; scan_type: string; status: string; confidence: number; duration_ms: number; input_preview: string | null; created_at: string }
+interface ReportRow { id: string; title: string; summary: string; status: string; created_at: string }
+interface NotificationRow { id: string; title: string; message: string; severity: string; read_at: string | null; created_at: string }
 
-interface DashboardContentProps {
-  user: SupabaseUser
-  profile: Profile | null
-}
-
-// Simulated threat data
-const generateThreatData = () => {
-  const hours = ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "Now"]
-  return hours.map((time) => ({
-    time,
-    threats: Math.floor(Math.random() * 50) + 10,
-    blocked: Math.floor(Math.random() * 45) + 5,
-  }))
-}
-
-const attackTypes = [
-  { name: "Phishing", value: 35, color: "#ef4444" },
-  { name: "Malware", value: 25, color: "#f97316" },
-  { name: "DDoS", value: 20, color: "#eab308" },
-  { name: "SQL Injection", value: 12, color: "#22d3ee" },
-  { name: "XSS", value: 8, color: "#a855f7" },
-]
-
-const recentAlerts = [
-  { id: 1, type: "critical", message: "Suspicious login attempt blocked", time: "2 min ago", ip: "192.168.1.105" },
-  { id: 2, type: "warning", message: "Unusual outbound traffic detected", time: "15 min ago", ip: "10.0.0.45" },
-  { id: 3, type: "info", message: "Security scan completed", time: "1 hour ago", ip: "System" },
-  { id: 4, type: "critical", message: "Malware signature detected", time: "2 hours ago", ip: "172.16.0.89" },
-  { id: 5, type: "warning", message: "Failed authentication attempts", time: "3 hours ago", ip: "192.168.2.201" },
-]
-
-export function DashboardContent({ user, profile }: DashboardContentProps) {
-  const [threatData, setThreatData] = useState(generateThreatData())
-  const [riskScore, setRiskScore] = useState(24)
-  const [showUserMenu, setShowUserMenu] = useState(false)
-  const [showMobileMenu, setShowMobileMenu] = useState(false)
-  const [stats, setStats] = useState({
-    threatsBlocked: 1247,
-    activeMonitors: 12,
-    systemUptime: 99.9,
-    lastScan: "5 min ago",
-  })
+export function DashboardContent({ user, profile }: { user: SupabaseUser; profile: Profile | null }) {
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
+  const [scans, setScans] = useState<ScanRow[]>([])
+  const [reports, setReports] = useState<ReportRow[]>([])
+  const [notifications, setNotifications] = useState<NotificationRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
-  // Simulate real-time updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setThreatData(generateThreatData())
-      setRiskScore(Math.floor(Math.random() * 30) + 15)
-      setStats((prev) => ({
-        ...prev,
-        threatsBlocked: prev.threatsBlocked + Math.floor(Math.random() * 5),
-      }))
-    }, 5000)
+  const load = async () => {
+    const [scanResult, reportResult, notificationResult] = await Promise.all([
+      supabase.from("scans").select("id,scan_type,status,confidence,duration_ms,input_preview,created_at").order("created_at", { ascending: false }).limit(50),
+      supabase.from("reports").select("id,title,summary,status,created_at").eq("status", "generated").order("created_at", { ascending: false }).limit(10),
+      supabase.from("notifications").select("id,title,message,severity,read_at,created_at").order("created_at", { ascending: false }).limit(10),
+    ])
+    const firstError = scanResult.error || reportResult.error || notificationResult.error
+    if (firstError) setError("Dashboard data is unavailable. Verify the Phase 2 and Phase 3 Supabase migrations.")
+    else {
+      setError(null)
+      setScans(scanResult.data ?? [])
+      setReports(reportResult.data ?? [])
+      setNotifications(notificationResult.data ?? [])
+    }
+    setLoading(false)
+  }
 
-    return () => clearInterval(interval)
-  }, [])
+  useEffect(() => { void load() }, [])
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    router.push("/")
-    router.refresh()
+  const handleSignOut = async () => { await supabase.auth.signOut(); router.push("/"); router.refresh() }
+  const markRead = async (id: string) => {
+    setActionError(null)
+    const { error: rpcError } = await supabase.rpc("mark_notification_read", { p_notification_id: id })
+    if (rpcError) setActionError("Notification could not be updated.")
+    else await load()
+  }
+  const archiveReport = async (id: string) => {
+    setActionError(null)
+    const { error: rpcError } = await supabase.rpc("archive_security_report", { p_report_id: id })
+    if (rpcError) setActionError("Report could not be archived.")
+    else await load()
   }
 
   const displayName = profile?.full_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "User"
+  const findings = scans.filter((scan) => scan.status !== "safe").length
+  const dangerous = scans.filter((scan) => scan.status === "dangerous").length
+  const unread = notifications.filter((item) => !item.read_at).length
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-50 glass-card border-b border-border/50">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
-            {/* Logo */}
-            <Link href="/" className="flex items-center gap-2">
-              <Shield className="h-8 w-8 text-primary" />
-              <span className="text-xl font-bold bg-gradient-to-r from-primary to-cyan-400 bg-clip-text text-transparent">
-                CyberShield AI
-              </span>
-            </Link>
-
-            {/* Desktop Nav */}
-            <div className="hidden md:flex items-center gap-6">
-              <Link href="/dashboard" className="text-primary font-medium">
-                Dashboard
-              </Link>
-              <button className="text-muted-foreground hover:text-foreground transition-colors">
-                Threats
-              </button>
-              <button className="text-muted-foreground hover:text-foreground transition-colors">
-                Reports
-              </button>
-              <button className="text-muted-foreground hover:text-foreground transition-colors">
-                Settings
-              </button>
-            </div>
-
-            {/* Right side */}
-            <div className="flex items-center gap-4">
-              {/* Notifications */}
-              <button className="relative p-2 text-muted-foreground hover:text-foreground transition-colors">
-                <Bell className="h-5 w-5" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full" />
-              </button>
-
-              {/* User Menu */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center gap-2 p-2 rounded-lg hover:bg-secondary/50 transition-colors"
-                >
-                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                    <User className="h-4 w-4 text-primary" />
-                  </div>
-                  <span className="hidden sm:block text-sm font-medium">{displayName}</span>
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                </button>
-
-                <AnimatePresence>
-                  {showUserMenu && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="absolute right-0 mt-2 w-48 glass-card rounded-lg border border-border/50 py-2 shadow-xl"
-                    >
-                      <div className="px-4 py-2 border-b border-border/50">
-                        <p className="text-sm font-medium">{displayName}</p>
-                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-                      </div>
-                      <button className="w-full flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors">
-                        <Settings className="h-4 w-4" />
-                        Settings
-                      </button>
-                      <button
-                        onClick={handleSignOut}
-                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
-                      >
-                        <LogOut className="h-4 w-4" />
-                        Sign out
-                      </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Mobile menu button */}
-              <button
-                onClick={() => setShowMobileMenu(!showMobileMenu)}
-                className="md:hidden p-2 text-muted-foreground hover:text-foreground"
-              >
-                {showMobileMenu ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-              </button>
-            </div>
-          </div>
+      <nav className="sticky top-0 z-50 glass-card border-b border-border/50"><div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between"><Link href="/" className="flex items-center gap-2"><Shield className="h-8 w-8 text-primary" /><span className="text-xl font-bold bg-gradient-to-r from-primary to-cyan-400 bg-clip-text text-transparent">CyberShield AI</span></Link><div className="flex items-center gap-4"><Link href="/dashboard#scanner" className="text-sm text-muted-foreground hover:text-foreground">Scanner</Link><Link href="/dashboard#threats" className="text-sm text-muted-foreground hover:text-foreground">Threats</Link><button onClick={handleSignOut} className="p-2 text-muted-foreground hover:text-destructive" aria-label="Sign out"><LogOut className="h-5 w-5" /></button></div></div></nav>
+      <main className="max-w-7xl mx-auto px-4 py-10">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8"><div><p className="text-sm text-primary font-mono">SECURE ACCOUNT DASHBOARD</p><h1 className="text-3xl md:text-4xl font-bold mt-1">Welcome, {displayName}</h1><p className="text-muted-foreground mt-2">Security activity is persisted in Supabase and isolated with row-level security.</p></div><div className="flex items-center gap-2 text-sm text-muted-foreground"><User className="h-4 w-4" />{user.email}</div></div>
+        {error && <div className="glass-card rounded-xl p-4 mb-6 text-sm text-cyber-orange">{error}</div>}
+        {actionError && <div className="glass-card rounded-xl p-4 mb-6 text-sm text-cyber-orange" role="alert">{actionError}</div>}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">{[{label:"Recorded scans",value:scans.length,icon:ScanLine},{label:"Findings",value:findings,icon:Shield},{label:"Dangerous",value:dangerous,icon:Shield},{label:"Unread alerts",value:unread,icon:Bell}].map((item) => <div key={item.label} className="glass-card rounded-xl p-5"><item.icon className="h-5 w-5 text-primary mb-3"/><div className="text-2xl font-bold font-mono">{loading ? "…" : item.value}</div><div className="text-xs text-muted-foreground mt-1">{item.label}</div></div>)}</div>
+        <div className="grid lg:grid-cols-3 gap-6">
+          <section className="glass-card rounded-2xl p-6 lg:col-span-2"><div className="flex items-center justify-between mb-5"><h2 className="text-lg font-semibold flex items-center gap-2"><ScanLine className="h-5 w-5 text-primary"/>Recent scans</h2><Link href="/dashboard#scanner" className="text-sm text-primary">Run a scan</Link></div>{scans.length === 0 ? <Empty title="No scans recorded" text="Run the Security Analyzer to create your first persisted scan."/> : <div className="space-y-3">{scans.slice(0,8).map((scan)=><div key={scan.id} className="rounded-xl bg-secondary/30 p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-medium capitalize">{scan.scan_type} · {scan.status}</p><p className="text-xs text-muted-foreground mt-1">{scan.input_preview || "Input not retained"}</p></div><div className="text-right text-xs text-muted-foreground"><p>{scan.confidence}% confidence</p><p>{scan.duration_ms} ms · {new Date(scan.created_at).toLocaleString()}</p></div></div></div>)}</div>}</section>
+          <section className="glass-card rounded-2xl p-6"><h2 className="text-lg font-semibold flex items-center gap-2 mb-5"><Bell className="h-5 w-5 text-primary"/>Notifications</h2>{notifications.length===0?<Empty title="No notifications" text="Security alerts appear here when generated by real events."/>:<div className="space-y-3">{notifications.slice(0,6).map((n)=><div key={n.id} className="rounded-lg bg-secondary/30 p-3"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-medium">{n.title}</p><p className="text-xs text-muted-foreground mt-1">{n.message}</p></div>{!n.read_at && <Button variant="ghost" size="icon" onClick={() => void markRead(n.id)} aria-label={`Mark ${n.title} as read`}><Check className="h-4 w-4"/></Button>}</div><p className="text-[11px] text-muted-foreground mt-2">{new Date(n.created_at).toLocaleString()}</p></div>)}</div>}</section>
+          <section className="glass-card rounded-2xl p-6 lg:col-span-2"><h2 className="text-lg font-semibold flex items-center gap-2 mb-5"><FileText className="h-5 w-5 text-primary"/>Reports</h2>{reports.length===0?<Empty title="No active reports" text="Reports are generated automatically when a scan is persisted."/>:<div className="space-y-3">{reports.slice(0,6).map((r)=><div key={r.id} className="rounded-lg bg-secondary/30 p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-medium">{r.title}</p><p className="text-sm text-muted-foreground mt-1">{r.summary}</p><p className="text-xs text-muted-foreground mt-2">{new Date(r.created_at).toLocaleString()}</p></div><Button variant="ghost" size="icon" onClick={() => void archiveReport(r.id)} aria-label={`Archive ${r.title}`}><Archive className="h-4 w-4"/></Button></div></div>)}</div>}</section>
+          <section className="glass-card rounded-2xl p-6"><h2 className="text-lg font-semibold flex items-center gap-2 mb-5"><Settings className="h-5 w-5 text-primary"/>Account</h2><SecuritySettings /></section>
         </div>
-
-        {/* Mobile menu */}
-        <AnimatePresence>
-          {showMobileMenu && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="md:hidden border-t border-border/50"
-            >
-              <div className="px-4 py-4 space-y-2">
-                <Link href="/dashboard" className="block py-2 text-primary font-medium">
-                  Dashboard
-                </Link>
-                <button className="block w-full text-left py-2 text-muted-foreground">Threats</button>
-                <button className="block w-full text-left py-2 text-muted-foreground">Reports</button>
-                <button className="block w-full text-left py-2 text-muted-foreground">Settings</button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </nav>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Welcome Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">
-            Welcome back, {displayName}
-          </h1>
-          <p className="text-muted-foreground">
-            Your security dashboard is actively monitoring your systems.
-          </p>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="glass-card p-6 rounded-xl border border-border/50"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Shield className="h-5 w-5 text-primary" />
-              </div>
-              <span className="flex items-center gap-1 text-xs text-green-400">
-                <TrendingUp className="h-3 w-3" />
-                +12%
-              </span>
-            </div>
-            <p className="text-2xl font-bold text-foreground">{stats.threatsBlocked.toLocaleString()}</p>
-            <p className="text-sm text-muted-foreground">Threats Blocked</p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="glass-card p-6 rounded-xl border border-border/50"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2 rounded-lg bg-cyan-500/10">
-                <Activity className="h-5 w-5 text-cyan-400" />
-              </div>
-              <span className="flex items-center gap-1 text-xs text-green-400">
-                <CheckCircle className="h-3 w-3" />
-                Active
-              </span>
-            </div>
-            <p className="text-2xl font-bold text-foreground">{stats.activeMonitors}</p>
-            <p className="text-sm text-muted-foreground">Active Monitors</p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="glass-card p-6 rounded-xl border border-border/50"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2 rounded-lg bg-green-500/10">
-                <Server className="h-5 w-5 text-green-400" />
-              </div>
-              <span className="text-xs text-muted-foreground">24/7</span>
-            </div>
-            <p className="text-2xl font-bold text-foreground">{stats.systemUptime}%</p>
-            <p className="text-sm text-muted-foreground">System Uptime</p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="glass-card p-6 rounded-xl border border-border/50"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2 rounded-lg bg-yellow-500/10">
-                <Clock className="h-5 w-5 text-yellow-400" />
-              </div>
-              <span className="text-xs text-green-400">Completed</span>
-            </div>
-            <p className="text-2xl font-bold text-foreground">{stats.lastScan}</p>
-            <p className="text-sm text-muted-foreground">Last Scan</p>
-          </motion.div>
-        </div>
-
-        {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Threat Activity Chart */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="lg:col-span-2 glass-card p-6 rounded-xl border border-border/50"
-          >
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">Threat Activity</h2>
-                <p className="text-sm text-muted-foreground">Real-time threat monitoring</p>
-              </div>
-              <div className="flex items-center gap-4 text-sm">
-                <span className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-primary" />
-                  Detected
-                </span>
-                <span className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-green-400" />
-                  Blocked
-                </span>
-              </div>
-            </div>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={threatData}>
-                  <defs>
-                    <linearGradient id="threatGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#22d3ee" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="blockedGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#4ade80" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#4ade80" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="time" stroke="#6b7280" fontSize={12} />
-                  <YAxis stroke="#6b7280" fontSize={12} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#1f2937",
-                      border: "1px solid #374151",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="threats"
-                    stroke="#22d3ee"
-                    fillOpacity={1}
-                    fill="url(#threatGradient)"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="blocked"
-                    stroke="#4ade80"
-                    fillOpacity={1}
-                    fill="url(#blockedGradient)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </motion.div>
-
-          {/* Risk Score */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-            className="glass-card p-6 rounded-xl border border-border/50"
-          >
-            <h2 className="text-lg font-semibold text-foreground mb-6">Risk Score</h2>
-            <div className="flex flex-col items-center">
-              <div className="relative w-40 h-40">
-                <svg className="w-full h-full transform -rotate-90">
-                  <circle
-                    cx="80"
-                    cy="80"
-                    r="70"
-                    fill="none"
-                    stroke="#1f2937"
-                    strokeWidth="12"
-                  />
-                  <circle
-                    cx="80"
-                    cy="80"
-                    r="70"
-                    fill="none"
-                    stroke={riskScore < 30 ? "#4ade80" : riskScore < 60 ? "#eab308" : "#ef4444"}
-                    strokeWidth="12"
-                    strokeLinecap="round"
-                    strokeDasharray={`${(riskScore / 100) * 440} 440`}
-                    className="transition-all duration-1000"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-4xl font-bold text-foreground">{riskScore}</span>
-                  <span className="text-sm text-muted-foreground">/ 100</span>
-                </div>
-              </div>
-              <p className="mt-4 text-lg font-medium text-green-400">Low Risk</p>
-              <p className="text-sm text-muted-foreground text-center mt-2">
-                Your systems are well protected
-              </p>
-            </div>
-          </motion.div>
-
-          {/* Attack Types */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7 }}
-            className="glass-card p-6 rounded-xl border border-border/50"
-          >
-            <h2 className="text-lg font-semibold text-foreground mb-6">Attack Types</h2>
-            <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={attackTypes}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={40}
-                    outerRadius={70}
-                    paddingAngle={4}
-                    dataKey="value"
-                  >
-                    {attackTypes.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#1f2937",
-                      border: "1px solid #374151",
-                      borderRadius: "8px",
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="grid grid-cols-2 gap-2 mt-4">
-              {attackTypes.slice(0, 4).map((type) => (
-                <div key={type.name} className="flex items-center gap-2">
-                  <span
-                    className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: type.color }}
-                  />
-                  <span className="text-xs text-muted-foreground">{type.name}</span>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-
-          {/* Recent Alerts */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8 }}
-            className="lg:col-span-2 glass-card p-6 rounded-xl border border-border/50"
-          >
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">Recent Alerts</h2>
-                <p className="text-sm text-muted-foreground">Latest security events</p>
-              </div>
-              <button className="text-sm text-primary hover:text-primary/80 transition-colors">
-                View all
-              </button>
-            </div>
-            <div className="space-y-3">
-              {recentAlerts.map((alert) => (
-                <div
-                  key={alert.id}
-                  className="flex items-center gap-4 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors"
-                >
-                  <div
-                    className={`p-2 rounded-lg ${
-                      alert.type === "critical"
-                        ? "bg-destructive/10"
-                        : alert.type === "warning"
-                        ? "bg-yellow-500/10"
-                        : "bg-primary/10"
-                    }`}
-                  >
-                    {alert.type === "critical" ? (
-                      <XCircle className="h-4 w-4 text-destructive" />
-                    ) : alert.type === "warning" ? (
-                      <AlertTriangle className="h-4 w-4 text-yellow-400" />
-                    ) : (
-                      <CheckCircle className="h-4 w-4 text-primary" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      {alert.message}
-                    </p>
-                    <p className="text-xs text-muted-foreground">IP: {alert.ip}</p>
-                  </div>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    {alert.time}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Protected Systems */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.9 }}
-          className="mt-6 glass-card p-6 rounded-xl border border-border/50"
-        >
-          <h2 className="text-lg font-semibold text-foreground mb-6">Protected Systems</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[
-              { name: "Web Server", icon: Globe, status: "protected", ip: "192.168.1.1" },
-              { name: "Database", icon: Server, status: "protected", ip: "192.168.1.2" },
-              { name: "API Gateway", icon: Wifi, status: "protected", ip: "192.168.1.3" },
-              { name: "Auth Service", icon: Lock, status: "monitoring", ip: "192.168.1.4" },
-            ].map((system) => (
-              <div
-                key={system.name}
-                className="p-4 rounded-lg bg-secondary/30 border border-border/50 hover:border-primary/50 transition-colors"
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <system.icon className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">{system.name}</p>
-                    <p className="text-xs text-muted-foreground">{system.ip}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      system.status === "protected" ? "bg-green-400" : "bg-yellow-400"
-                    }`}
-                  />
-                  <span className="text-xs text-muted-foreground capitalize">{system.status}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
       </main>
     </div>
   )
 }
+
+function Empty({ title, text }: { title: string; text: string }) { return <div className="min-h-28 flex items-center justify-center text-center text-muted-foreground"><div><p className="font-medium text-foreground">{title}</p><p className="text-sm mt-1">{text}</p></div></div> }

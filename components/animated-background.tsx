@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react"
 
+
 interface Particle {
   x: number
   y: number
@@ -11,11 +12,7 @@ interface Particle {
   opacity: number
 }
 
-interface Connection {
-  from: number
-  to: number
-  opacity: number
-}
+
 
 export function AnimatedBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
