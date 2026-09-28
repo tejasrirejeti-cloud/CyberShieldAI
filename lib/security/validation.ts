@@ -19,7 +19,7 @@ export function validateScanInput(type: ScanInputType, input: string):
     return { ok: false, message: "Unsupported analysis type." }
   }
 
-  if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(input)) {
+  if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(input)) { // eslint-disable-line no-control-regex
     return { ok: false, message: "The input contains unsupported control characters." }
   }
 
