@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { validateScanInput } from "@/lib/security/validation"
 
 type ScanType = "url" | "file" | "message"
 type ScanResult = "safe" | "suspicious" | "dangerous"
@@ -264,14 +265,20 @@ export function AIAnalysisScanner() {
   const supabase = createClient()
 
   const handleScan = async () => {
-    if (!input.trim()) return
+    const validation = validateScanInput(activeTab, input)
+    if (!validation.ok) {
+      setResult(null)
+      setSaveError(validation.message)
+      return
+    }
 
+    const normalizedInput = validation.value
     setIsScanning(true)
     setResult(null)
     setSaveError(null)
 
     try {
-      const scanResult = analyzeInput(input, activeTab)
+      const scanResult = analyzeInput(normalizedInput, activeTab)
       setResult(scanResult)
 
       const findings = scanResult.threats.map((threat) => ({
@@ -279,7 +286,7 @@ export function AIAnalysisScanner() {
         details: scanResult.details,
       }))
 
-      const inputPreview = activeTab === "message" ? `Message (${input.length} characters)` : input.slice(0, 240)
+      const inputPreview = activeTab === "message" ? `Message (${normalizedInput.length} characters)` : normalizedInput.slice(0, 240)
       const { error } = await supabase.rpc("record_security_scan", {
         p_scan_type: activeTab,
         p_status: scanResult.status,
