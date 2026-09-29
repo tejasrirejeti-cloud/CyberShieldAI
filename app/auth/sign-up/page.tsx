@@ -11,6 +11,7 @@ import {
   User,
   AlertCircle,
   Loader2,
+  CheckCircle2,
 } from "lucide-react"
 import { motion } from "framer-motion"
 
@@ -19,6 +20,7 @@ export default function SignUpPage() {
   const [password, setPassword] = useState("")
   const [fullName, setFullName] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
 
   const router = useRouter()
@@ -29,38 +31,68 @@ export default function SignUpPage() {
 
     setLoading(true)
     setError(null)
+    setSuccess(false)
 
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-  data: {
-    full_name: fullName,
+      const { data, error } = await supabase.auth.signUp({
+  email: email.trim(),
+  password,
+  options: {
+    emailRedirectTo: `${window.location.origin}/auth/confirm`,
+    data: {
+      full_name: fullName.trim(),
+    },
   },
-},
-      })
+})
 
-      if (error) {
-        // Show the real Supabase error in the browser console
-        console.error("SUPABASE SIGNUP ERROR:", error)
-        console.error("ERROR MESSAGE:", error.message)
-        console.error("ERROR CODE:", error.code)
-        console.error("ERROR STATUS:", error.status)
+if (error) {
+  console.error("SUPABASE SIGNUP ERROR:", error)
+  setError(error.message || "Signup failed. Please try again.")
+  setLoading(false)
+  return
+}
 
-        // Show the actual error message in the UI
-        setError(
-          error.message ||
-            error.code ||
-            "Signup failed. Please try again."
-        )
+if (data.user && !data.session) {
+  setSuccess(true)
+  setLoading(false)
+  return
+}
 
+if (data.session) {
+  router.replace("/dashboard")
+  return
+}
+
+setSuccess(true)
+setLoading(false)
+      /*
+       * When email confirmation is enabled, Supabase normally creates
+       * the account but does not create an active session.
+       *
+       * In that case, the user must verify their email before logging in.
+       */
+      if (data.user && !data.session) {
+        setSuccess(true)
         setLoading(false)
         return
       }
 
-      // Signup request succeeded
-      router.push("/dashboard")
+      /*
+       * If email confirmation is disabled and Supabase gives us a session,
+       * the user can proceed directly to the dashboard.
+       */
+      if (data.session) {
+        router.replace("/dashboard")
+        return
+      }
+
+      /*
+       * Defensive fallback: account creation succeeded but there is no
+       * session. Treat it as requiring email verification rather than
+       * incorrectly sending the user to the dashboard.
+       */
+      setSuccess(true)
+      setLoading(false)
     } catch (err) {
       console.error("UNEXPECTED SIGNUP ERROR:", err)
 
@@ -74,10 +106,85 @@ export default function SignUpPage() {
     }
   }
 
+  if (success) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-900/20 via-background to-background" />
+
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-500/5 rounded-full blur-3xl" />
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-md relative z-10"
+        >
+          <div className="text-center mb-8">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 mb-4"
+            >
+              <div className="relative">
+                <Shield className="h-10 w-10 text-primary" />
+                <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" />
+              </div>
+
+              <span className="text-2xl font-bold bg-gradient-to-r from-primary to-cyan-400 bg-clip-text text-transparent">
+                CyberShield AI
+              </span>
+            </Link>
+
+            <h1 className="text-2xl font-semibold text-foreground">
+              Check your email
+            </h1>
+
+            <p className="text-muted-foreground mt-2">
+              We&apos;ve sent a verification link to:
+            </p>
+
+            <p className="text-primary font-medium mt-1 break-all">
+              {email}
+            </p>
+          </div>
+
+          <div className="glass-card p-8 rounded-2xl border border-border/50">
+            <div className="flex flex-col items-center text-center">
+              <div className="flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-5">
+                <CheckCircle2 className="h-8 w-8 text-primary" />
+              </div>
+
+              <h2 className="text-lg font-semibold text-foreground">
+                Verify your email address
+              </h2>
+
+              <p className="text-sm text-muted-foreground mt-3 leading-6">
+                Click the verification link in the email we sent you.
+                After verification, return here and sign in to your
+                CyberShield AI account.
+              </p>
+
+              <Link
+                href="/auth/login"
+                className="w-full mt-6 py-3 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg transition-all flex items-center justify-center glow-cyan"
+              >
+                Go to Sign In
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-6 flex items-center justify-center gap-2 text-muted-foreground text-sm">
+            <Shield className="h-4 w-4 text-primary" />
+            <span>Protected by 256-bit encryption</span>
+          </div>
+        </motion.div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
-
-      {/* Background effects */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-900/20 via-background to-background" />
 
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
@@ -90,8 +197,6 @@ export default function SignUpPage() {
         transition={{ duration: 0.5 }}
         className="w-full max-w-md relative z-10"
       >
-
-        {/* Logo */}
         <div className="text-center mb-8">
           <Link
             href="/"
@@ -99,7 +204,6 @@ export default function SignUpPage() {
           >
             <div className="relative">
               <Shield className="h-10 w-10 text-primary" />
-
               <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" />
             </div>
 
@@ -117,12 +221,8 @@ export default function SignUpPage() {
           </p>
         </div>
 
-        {/* Sign Up Form */}
         <div className="glass-card p-8 rounded-2xl border border-border/50">
-
           <form onSubmit={handleSignUp} className="space-y-6">
-
-            {/* Error message */}
             {error && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
@@ -137,7 +237,6 @@ export default function SignUpPage() {
               </motion.div>
             )}
 
-            {/* Full Name */}
             <div className="space-y-2">
               <label
                 htmlFor="fullName"
@@ -161,7 +260,6 @@ export default function SignUpPage() {
               </div>
             </div>
 
-            {/* Email */}
             <div className="space-y-2">
               <label
                 htmlFor="email"
@@ -185,7 +283,6 @@ export default function SignUpPage() {
               </div>
             </div>
 
-            {/* Password */}
             <div className="space-y-2">
               <label
                 htmlFor="password"
@@ -214,7 +311,6 @@ export default function SignUpPage() {
               </p>
             </div>
 
-            {/* Create Account Button */}
             <button
               type="submit"
               disabled={loading}
@@ -229,10 +325,8 @@ export default function SignUpPage() {
                 "Create Account"
               )}
             </button>
-
           </form>
 
-          {/* Login link */}
           <div className="mt-6 text-center">
             <p className="text-muted-foreground text-sm">
               Already have an account?{" "}
@@ -245,18 +339,12 @@ export default function SignUpPage() {
               </Link>
             </p>
           </div>
-
         </div>
 
-        {/* Security badge */}
         <div className="mt-6 flex items-center justify-center gap-2 text-muted-foreground text-sm">
           <Shield className="h-4 w-4 text-primary" />
-
-          <span>
-            Protected by 256-bit encryption
-          </span>
+          <span>Protected by 256-bit encryption</span>
         </div>
-
       </motion.div>
     </div>
   )
