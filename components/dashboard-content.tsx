@@ -31,7 +31,18 @@ export function DashboardContent({ user, profile }: { user: SupabaseUser; profil
       supabase.from("notifications").select("id,title,message,severity,read_at,created_at").order("created_at", { ascending: false }).limit(10),
     ])
     const firstError = scanResult.error || reportResult.error || notificationResult.error
-    if (firstError) setError("Dashboard data is unavailable. Verify the Phase 2 and Phase 3 Supabase migrations.")
+
+if (firstError) {
+  console.error("CYBERSHIELD DASHBOARD QUERY ERROR", {
+    scan: scanResult.error,
+    reports: reportResult.error,
+    notifications: notificationResult.error,
+  })
+
+  setError(
+    `Dashboard query failed: ${firstError.message || "Unknown Supabase error"}`
+  )
+} 
     else {
       setError(null)
       setScans(scanResult.data ?? [])
