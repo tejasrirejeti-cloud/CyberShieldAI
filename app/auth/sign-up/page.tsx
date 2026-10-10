@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState } from "react"
@@ -35,62 +36,35 @@ export default function SignUpPage() {
 
     try {
       const { data, error } = await supabase.auth.signUp({
-  email: email.trim(),
-  password,
-  options: {
-    emailRedirectTo: `${window.location.origin}/auth/confirm`,
-    data: {
-      full_name: fullName.trim(),
-    },
-  },
-})
+        email: email.trim(),
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/confirm`,
+          data: {
+            full_name: fullName.trim(),
+          },
+        },
+      })
 
-if (error) {
-  console.error("SUPABASE SIGNUP ERROR:", error)
-  setError(error.message || "Signup failed. Please try again.")
-  setLoading(false)
-  return
-}
+      if (error) {
+        console.error("SUPABASE SIGNUP ERROR:", error)
+        setError(error.message || "Signup failed. Please try again.")
+        setLoading(false)
+        return
+      }
 
-if (data.user && !data.session) {
-  setSuccess(true)
-  setLoading(false)
-  return
-}
-
-if (data.session) {
-  router.replace("/dashboard")
-  return
-}
-
-setSuccess(true)
-setLoading(false)
-      /*
-       * When email confirmation is enabled, Supabase normally creates
-       * the account but does not create an active session.
-       *
-       * In that case, the user must verify their email before logging in.
-       */
       if (data.user && !data.session) {
         setSuccess(true)
         setLoading(false)
         return
       }
 
-      /*
-       * If email confirmation is disabled and Supabase gives us a session,
-       * the user can proceed directly to the dashboard.
-       */
       if (data.session) {
         router.replace("/dashboard")
         return
       }
 
-      /*
-       * Defensive fallback: account creation succeeded but there is no
-       * session. Treat it as requiring email verification rather than
-       * incorrectly sending the user to the dashboard.
-       */
+      // Defensive fallback when signup returns no active session.
       setSuccess(true)
       setLoading(false)
     } catch (err) {
@@ -109,7 +83,7 @@ setLoading(false)
   if (success) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-900/20 via-background to-background" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-cyan-900/20 via-background to-background" />
 
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
 
@@ -185,7 +159,7 @@ setLoading(false)
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-900/20 via-background to-background" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-cyan-900/20 via-background to-background" />
 
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
 
@@ -231,9 +205,7 @@ setLoading(false)
               >
                 <AlertCircle className="h-4 w-4 shrink-0" />
 
-                <p className="text-sm break-words">
-                  {error}
-                </p>
+                <p className="text-sm break-words">{error}</p>
               </motion.div>
             )}
 
@@ -255,6 +227,7 @@ setLoading(false)
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="John Doe"
                   required
+                  autoComplete="name"
                   className="w-full pl-10 pr-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all text-foreground placeholder:text-muted-foreground"
                 />
               </div>
@@ -278,6 +251,7 @@ setLoading(false)
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   required
+                  autoComplete="email"
                   className="w-full pl-10 pr-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all text-foreground placeholder:text-muted-foreground"
                 />
               </div>
@@ -302,6 +276,7 @@ setLoading(false)
                   placeholder="Create a strong password"
                   required
                   minLength={6}
+                  autoComplete="new-password"
                   className="w-full pl-10 pr-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all text-foreground placeholder:text-muted-foreground"
                 />
               </div>
@@ -330,7 +305,6 @@ setLoading(false)
           <div className="mt-6 text-center">
             <p className="text-muted-foreground text-sm">
               Already have an account?{" "}
-
               <Link
                 href="/auth/login"
                 className="text-primary hover:text-primary/80 font-medium transition-colors"

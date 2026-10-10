@@ -62,8 +62,8 @@ export function AIDashboard() {
         .limit(100)
       if (!active) return
       if (queryError) {
-        setError("Analytics are unavailable until the Phase 2 Supabase migration is applied.")
-        setRows([])
+        console.error("CYBERSHIELD ANALYTICS QUERY ERROR", queryError)
+        setError("Analytics are temporarily unavailable.")
       } else {
         setError(null)
         setRows(data ?? [])

@@ -18,7 +18,7 @@ export function ThreatDetectionPanel() {
   const loadThreats = async () => {
     setLoading(true)
     const { data, error: queryError } = await supabase.from("threats").select("id,severity,title,details,source,status,created_at").eq("status", "open").order("created_at", { ascending: false }).limit(25)
-    if (queryError) { setError("Threat data is unavailable. Apply the Phase 2 and Phase 3 migrations."); setThreats([]) }
+    if (queryError) { console.error("CYBERSHIELD THREAT QUERY ERROR", queryError); setError("Threat data is temporarily unavailable."); setThreats([]) }
     else { setError(null); setThreats((data ?? []) as Threat[]) }
     setLoading(false)
   }
